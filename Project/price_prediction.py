@@ -5,15 +5,15 @@ import numpy as np
 from sklearn.preprocessing import  FunctionTransformer
 import gzip
 import argparse
-
+import warnings
 def load_models():
-    tuned_ensemble_model = joblib.load(gzip.open('tuned_ensemble_model.pkl.gz', 'rb'))
-    knn_model = joblib.load(open('knn_model.pkl', 'rb'))
+    tuned_ensemble_model = joblib.load(gzip.open('../../Files/tuned_ensemble_model.pkl.gz', 'rb'))
+    knn_model = joblib.load(open('../../Files/knn_model.pkl', 'rb'))
     return tuned_ensemble_model, knn_model
 
 def get_default_values():
     """Load default values from df_all_brands.pkl"""
-    df = pd.read_pickle("df_all_brands.pkl")
+    df = pd.read_pickle("../../Files/df_all_brands.pkl")
     defaults = {
         "Brand": df["Brand"].mode()[0],  
         "Bike": df["Bike"].mode()[0],    
@@ -53,6 +53,7 @@ def predict_price(Brand=None ,Bike=None , Category=None, Power=None, Displacemen
     """Predict price using trained models"""
     target_transformer_log = FunctionTransformer(np.log1p,inverse_func=np.expm1, validate=True)
 
+    warnings.simplefilter("ignore", category=UserWarning)
 
     # Load models and default values
     tuned_ensemble_model, knn_model = load_models()
