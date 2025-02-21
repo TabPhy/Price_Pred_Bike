@@ -1,0 +1,17 @@
+Condition = Condition
+Condition_Desc = Condition Description
+Price = Price
+Location = Location
+Model Year = Model Year
+Mileage = Mileage on Vehicle.
+Exterior_Color = Exterior Color.
+Make = Make/Brand
+Warranty = Does the vehicle have a warranty?
+Model = Model of Bike
+Sub_Model = Optional Sub Model Field.
+Type = Type of Motorcycle
+Vehicle_Title = Vehicle Title
+OBO = Was there an option to offer a different amount than the listed price?
+Feedback_Perc = Percentage of Positive Feedback the Seller has received. 
+Watch_Count = Number of people watching item at time the data was scraped.
+N_Reviews = Number of reviews for the ebay seller account attached to said listing.
