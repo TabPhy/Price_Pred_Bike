@@ -2,7 +2,7 @@ _this README.md is AI generated, as i am too unfunny for coming up with somethin
 
 # Price Prediction for Used Motorcycles 🏍️💰
 
-Welcome to the Price Prediction for Used Motorcycles project! 🚴‍♂️ Whether you’re buying or selling, this tool predicts the price of used bikes from popular brands such as BMW, Suzuki, Yamaha, Royal Enfield, KTM, and Ducati.
+Welcome to the Price Prediction for Used Motorcycles project! Whether you’re buying or selling, this tool predicts the price of used bikes from popular brands such as BMW, Suzuki, Yamaha, Royal Enfield, KTM, and Ducati.
 
 ## How it Works 🔧
 
