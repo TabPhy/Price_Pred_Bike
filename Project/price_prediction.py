@@ -6,14 +6,17 @@ from sklearn.preprocessing import  FunctionTransformer
 import gzip
 import argparse
 import warnings
+import os 
+
 def load_models():
-    tuned_ensemble_model = joblib.load(gzip.open('../../Files/tuned_ensemble_model.pkl.gz', 'rb'))
-    knn_model = joblib.load(open('../../Files/knn_model.pkl', 'rb'))
+
+    tuned_ensemble_model = joblib.load(gzip.open(filepath+'tuned_ensemble_model.pkl.gz', 'rb'))
+    knn_model = joblib.load(open(filepath+'knn_model.pkl', 'rb'))
     return tuned_ensemble_model, knn_model
 
 def get_default_values():
     """Load default values from df_all_brands.pkl"""
-    df = pd.read_pickle("../../Files/df_all_brands.pkl")
+    df = pd.read_pickle(filepath+'df_all_brands.pkl')
     defaults = {
         "Brand": df["Brand"].mode()[0],  
         "Bike": df["Bike"].mode()[0],    
@@ -93,6 +96,8 @@ def predict_price(Brand=None ,Bike=None , Category=None, Power=None, Displacemen
 # Example usage:
 #predict_price(Brand="Honda", Bike="CB500", Category="Sport", Power=50, Displacement=471, Torque=43, Mileage=20000, Age=5)
 if __name__ == "__main__":
+    script_dir = os.path.dirname(os.path.abspath(__file__)) 
+    filepath = os.path.join(script_dir, "Files/")
     print("🚀 Welcome to the Bike Price Predictor!")
     defaults = get_default_values()
     user_inputs = get_user_input(defaults)
