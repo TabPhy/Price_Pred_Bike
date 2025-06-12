@@ -17,7 +17,7 @@ This project uses Machine Learning (ML) models to predict the price of your used
 ## How to Use 🔑
 
 	1.	Clone this repository
-  	2.	Double click or run the executable in Project/build/price_prediction ./price_prediction (if another system that MacOS is used, the script Project/price_prediction.py needs to be used. An interpretation of the exec for other systems will follow)
+  	2.	execute the price_prediction.py python file
 	3.	Enter the bike details (brand, age, condition, etc.) when prompted.
 	4.	Get your price prediction from the trained models! 🎯
 
@@ -25,7 +25,6 @@ This project uses Machine Learning (ML) models to predict the price of your used
 
 	•	You can input details interactively via the terminal (yes, that means you can skip some values too 😉).
 	•	Multiple models working together for super accurate predictions!
-	•	Enjoy some fun ASCII motorcycle art along the way! 🏁
 
 ## Models Used:
 
