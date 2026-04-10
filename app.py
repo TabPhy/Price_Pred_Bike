@@ -90,8 +90,7 @@ with col1:
                                    value=DEFAULTS["Displacement"], step=10.0)
 
 with col2:
-    bike_model = st.text_input("Model name", value=DEFAULTS["Bike"],
-                               help="e.g. R1200GS, MT-07, 1290 Super Duke")
+
     torque = st.number_input("Torque (Nm)", min_value=1.0, max_value=500.0,
                              value=DEFAULTS["Torque [Nm]"], step=1.0)
     mileage = st.number_input("Mileage (km)", min_value=0.0, max_value=500_000.0,
@@ -109,7 +108,7 @@ if st.button("💰 Predict Price", use_container_width=True, type="primary"):
 
             input_data = {
                 "Brand":            brand.lower(),
-                "Bike":             bike_model.lower(),
+                "Bike":             bike_model.lower().strip() if bike_model.strip() else np.nan,
                 "Category":         category,
                 "Power [hp]":       power,
                 "Displacement [ccm]": displacement,
@@ -122,8 +121,10 @@ if st.button("💰 Predict Price", use_container_width=True, type="primary"):
             X = pd.DataFrame([input_data])
             # pandas 3.0 defaults strings to StringDtype instead of object.
             # The fitted ColumnTransformer expects object dtype — cast explicitly.
-            for col in ["Brand", "Bike", "Category"]:
+            for col in ["Brand", "Category"]:
                 X[col] = X[col].astype(object)
+            if not pd.isna(X["Bike"].iloc[0]):
+                X["Bike"] = X["Bike"].astype(object)
             X["Condition"] = X["Condition"].astype(bool)
 
             transformer = FunctionTransformer(np.log1p, inverse_func=np.expm1, validate=True)
