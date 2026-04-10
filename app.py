@@ -17,12 +17,17 @@ if not hasattr(_ct, "_RemainderColsList"):
     _ct._RemainderColsList = _RemainderColsList
 
 # Patch 2: SimpleImputer._fill_dtype added in sklearn 1.5 — old pickles lack it.
+# We derive the correct dtype from statistics_ (set during fit) so that
+# numeric imputers get float64 and string/object imputers get object dtype.
 from sklearn.impute import SimpleImputer as _SI
 import numpy as _np
 _si_orig_transform = _SI.transform
 def _si_transform_safe(self, X):
     if not hasattr(self, "_fill_dtype"):
-        self._fill_dtype = _np.float64
+        if hasattr(self, "statistics_"):
+            self._fill_dtype = self.statistics_.dtype
+        else:
+            self._fill_dtype = _np.float64
     return _si_orig_transform(self, X)
 _SI.transform = _si_transform_safe
 
