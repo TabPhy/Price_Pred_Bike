@@ -6,7 +6,8 @@ from sklearn.preprocessing import FunctionTransformer
 import gzip
 import warnings
 import os
-
+from sklearn.impute import SimpleImputer as _SI
+import numpy as _np
 # ── sklearn compatibility shims ───────────────────────────────────────────────
 # Patch 1: _RemainderColsList removed in sklearn 1.5+
 import sklearn.compose._column_transformer as _ct
@@ -28,6 +29,18 @@ def _si_transform_safe(self, X):
             self._fill_dtype = self.statistics_.dtype
         else:
             self._fill_dtype = _np.float64
+
+    # Patch _validate_input to preserve object dtype for categorical imputers
+    orig_validate = self._validate_input
+    def _patched_validate(X, in_fit=False):
+        if hasattr(self, "statistics_") and self.statistics_.dtype == _np.object_:
+            import pandas as _pd
+            if isinstance(X, _pd.DataFrame):
+                return X.to_numpy(dtype=object)
+            return _np.asarray(X, dtype=object)
+        return orig_validate(X, in_fit=in_fit)
+    self._validate_input = _patched_validate
+
     return _si_orig_transform(self, X)
 _SI.transform = _si_transform_safe
 
