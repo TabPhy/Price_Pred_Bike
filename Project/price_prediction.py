@@ -1,104 +1,154 @@
+import streamlit as st
 import pandas as pd
 import joblib
-import pickle
 import numpy as np
-from sklearn.preprocessing import  FunctionTransformer
+from sklearn.preprocessing import FunctionTransformer
 import gzip
-import argparse
 import warnings
-import os 
+import os
 
+# ── sklearn compatibility shims ───────────────────────────────────────────────
+# Patch 1: _RemainderColsList removed in sklearn 1.5+
+import sklearn.compose._column_transformer as _ct
+if not hasattr(_ct, "_RemainderColsList"):
+    class _RemainderColsList(list):
+        def __reduce__(self):
+            return (self.__class__, (list(self),))
+    _ct._RemainderColsList = _RemainderColsList
+
+# Patch 2: SimpleImputer._fill_dtype added in sklearn 1.5 — old pickles lack it.
+# We derive the correct dtype from statistics_ (set during fit) so that
+# numeric imputers get float64 and string/object imputers get object dtype.
+from sklearn.impute import SimpleImputer as _SI
+import numpy as _np
+_si_orig_transform = _SI.transform
+def _si_transform_safe(self, X):
+    if not hasattr(self, "_fill_dtype"):
+        if hasattr(self, "statistics_"):
+            self._fill_dtype = self.statistics_.dtype
+        else:
+            self._fill_dtype = _np.float64
+    return _si_orig_transform(self, X)
+_SI.transform = _si_transform_safe
+
+# ── Page config ───────────────────────────────────────────────────────────────
+st.set_page_config(
+    page_title="🏍️ Bike Price Predictor",
+    page_icon="🏍️",
+    layout="centered",
+)
+
+# ── Paths ─────────────────────────────────────────────────────────────────────
+BASE_DIR  = os.path.dirname(os.path.abspath(__file__))
+FILES_DIR = os.path.join(BASE_DIR, "Project", "Files")
+
+# ── Cached loaders ────────────────────────────────────────────────────────────
+@st.cache_resource(show_spinner="Loading models…")
 def load_models():
+    ensemble = joblib.load(gzip.open(os.path.join(FILES_DIR, "tuned_ensemble_model.pkl.gz"), "rb"))
+    knn      = joblib.load(gzip.open(os.path.join(FILES_DIR, "knn_model.pkl.gz"), "rb"))
+    return ensemble, knn
 
-    tuned_ensemble_model = joblib.load(gzip.open(filepath+'tuned_ensemble_model.pkl.gz', 'rb'))
-    knn_model = joblib.load(open(filepath+'knn_model.pkl', 'rb'))
-    return tuned_ensemble_model, knn_model
+# Defaults computed from all_bikez_curated.csv — avoids loading the LFS-tracked df_all_brands.pkl
+DEFAULTS = {
+    "Brand":        "bmw",
+    "Bike":         "r 1200 gs",
+    "Category":     "Sport",
+    "Power [hp]":   50.8,
+    "Displacement": 552.5,
+    "Torque [Nm]":  64.5,
+    "Mileage [km]": 15000.0,
+    "Age [a]":      5,
+}
 
-def get_default_values():
-    """Load default values from df_all_brands.pkl"""
-    df = pd.read_pickle(filepath+'df_all_brands.pkl')
-    defaults = {
-        "Brand": df["Brand"].mode()[0],  
-        "Bike": df["Bike"].mode()[0],    
-        "Category": df["Category"].mode()[0],  
-        "Power [hp]": df["Power (hp)"].mean(),  
-        "Displacement [ccm]": df["Displacement (ccm)"].mean(),  
-        "Torque [Nm]": df["Torque (Nm)"].mean(),  
-        "Mileage [km]": df["mileage"].mean(),  
-        "Age [a]": df["Age"].mean(),  
-        "Condition": True,
-    }
-    return defaults
+# ── Constants ─────────────────────────────────────────────────────────────────
+KNOWN_BRANDS = ["BMW", "Ducati", "KTM", "Royal Enfield", "Suzuki", "Yamaha"]
+CATEGORIES   = [
+    "Allround", "Classic", "Cross / motocross", "Custom / cruiser",
+    "Enduro / offroad", "Naked bike", "Prototype / concept model",
+    "Scooter", "Sport", "Sport touring", "Super motard",
+    "Touring", "Trial", "Unspecified category",
+]
 
-def get_user_input(defaults):
-    """Prompt user for input and use defaults if they press Enter"""
-    
-    def get_value(prompt, default, data_type):
-        user_input = input(f"{prompt} (Press Enter to use default: {default}): ")
+# ── UI ────────────────────────────────────────────────────────────────────────
+st.title("🏍️ Motorcycle Price Predictor")
+st.markdown(
+    "Enter your bike's details below and get an estimated **used market price** "
+    "based on a trained machine learning model."
+)
+st.divider()
+
+col1, col2 = st.columns(2)
+
+with col1:
+    brand = st.selectbox("Brand", options=KNOWN_BRANDS, index=0)
+    category = st.selectbox("Category", options=CATEGORIES,
+                            index=CATEGORIES.index("Sport") if "Sport" in CATEGORIES else 0)
+    power = st.number_input("Power (hp)", min_value=1.0, max_value=500.0,
+                            value=DEFAULTS["Power [hp]"], step=1.0)
+    displacement = st.number_input("Displacement (ccm)", min_value=50.0, max_value=3000.0,
+                                   value=DEFAULTS["Displacement"], step=10.0)
+
+with col2:
+
+    torque = st.number_input("Torque (Nm)", min_value=1.0, max_value=500.0,
+                             value=DEFAULTS["Torque [Nm]"], step=1.0)
+    mileage = st.number_input("Mileage (km)", min_value=0.0, max_value=500_000.0,
+                              value=DEFAULTS["Mileage [km]"], step=500.0)
+    age = st.number_input("Age (years)", min_value=0, max_value=60,
+                          value=int(DEFAULTS["Age [a]"]), step=1)
+
+st.divider()
+
+# ── Prediction ────────────────────────────────────────────────────────────────
+if st.button("💰 Predict Price", use_container_width=True, type="primary"):
+    with st.spinner("Crunching numbers…"):
         try:
-            return (lambda x: x.lower() if isinstance(x, str) else x)(data_type(user_input)) if user_input else default
-        except ValueError:
-            print(f"Wrong data format! Using default: {default}")
-        return default  
-    
-    brand = get_value("Enter Bike Brand", defaults["Brand"], str)
-    bike = get_value("Enter Bike Model", defaults["Bike"], str)
-    category = get_value("Enter Bike Category", defaults["Category"], str)
-    power = get_value("Enter Power (hp)", defaults["Power [hp]"], float)
-    displacement = get_value("Enter Displacement (ccm)", defaults["Displacement [ccm]"], float)
-    torque = get_value("Enter Torque (Nm)", defaults["Torque [Nm]"], float)
-    mileage = get_value("Enter Mileage (km)", defaults["Mileage [km]"], float)
-    age = get_value("Enter Age (years)", defaults["Age [a]"], int)
+            ensemble_model, knn_model = load_models()
 
-    return brand, bike, category, power, displacement, torque, mileage, age
+            input_data = {
+                "Brand":            brand.lower(),
+                "Bike":             bike_model.lower().strip() if bike_model.strip() else np.nan,
+                "Category":         category,
+                "Power [hp]":       power,
+                "Displacement [ccm]": displacement,
+                "Torque [Nm]":      torque,
+                "Mileage [km]":     mileage,
+                "Age [a]":          int(age),
+                "Condition":        mileage > 100,
+            }
 
-def predict_price(Brand=None ,Bike=None , Category=None, Power=None, Displacement=None, Torque=None, Mileage=None, Age=None):
-    """Predict price using trained models"""
-    target_transformer_log = FunctionTransformer(np.log1p,inverse_func=np.expm1, validate=True)
+            X = pd.DataFrame([input_data])
+            # pandas 3.0 defaults strings to StringDtype instead of object.
+            # The fitted ColumnTransformer expects object dtype — cast explicitly.
+            for col in ["Brand", "Category"]:
+                X[col] = X[col].astype(object)
+            if not pd.isna(X["Bike"].iloc[0]):
+                X["Bike"] = X["Bike"].astype(object)
+            X["Condition"] = X["Condition"].astype(bool)
 
-    warnings.simplefilter("ignore", category=UserWarning)
+            transformer = FunctionTransformer(np.log1p, inverse_func=np.expm1, validate=True)
 
-    # Load models and default values
-    tuned_ensemble_model, knn_model = load_models()
-    defaults = get_default_values()
+            warnings.simplefilter("ignore", category=UserWarning)
+            ens_pred = ensemble_model.predict(X)
+            knn_pred = knn_model.predict(X)
 
-    # Fill missing values with defaults
-    data = {
-        "Brand": Brand if Brand else defaults["Brand"],
-        "Bike": Bike if Bike else defaults["Bike"],
-        "Category": Category if Category else defaults["Category"],
-        "Power [hp]": Power if Power else defaults["Power [hp]"],
-        "Displacement [ccm]": Displacement if Displacement else defaults["Displacement [ccm]"],
-        "Torque [Nm]": Torque if Torque else defaults["Torque [Nm]"],
-        "Mileage [km]": Mileage if Mileage else defaults["Mileage [km]"],
-        "Age [a]": Age if Age else defaults["Age [a]"],
-        "Condition": Mileage > 100 if Mileage else defaults["Condition"],
-    }
+            ens_price = float(transformer.inverse_transform(ens_pred.reshape(-1, 1))[0])
+            knn_price = float(transformer.inverse_transform(knn_pred.reshape(-1, 1))[0])
+            avg_price = (ens_price + knn_price) / 2
 
-    # Convert to DataFrame
-    X = pd.DataFrame([data])
+            st.success("Prediction complete!")
 
-    # Predict prices
-    y_pred_ens = tuned_ensemble_model.predict(X)
-    y_pred_knn = knn_model.predict(X)
-    y_pred_ens_inv = target_transformer_log.inverse_transform(y_pred_ens.reshape(-1, 1)).reshape(-1)
-    y_pred_knn_inv = target_transformer_log.inverse_transform(y_pred_knn.reshape(-1, 1)).reshape(-1)
+            r1, r2, r3 = st.columns(3)
+            r1.metric("🤖 Ensemble Model",  f"${ens_price:,.0f}")
+            r2.metric("📍 KNN Model",       f"${knn_price:,.0f}")
+            r3.metric("📊 Average",         f"${avg_price:,.0f}")
 
-    # Convert to float
-    ens_price = float(y_pred_ens_inv[0])
-    knn_price = float(y_pred_knn_inv[0])
+            st.caption(
+                "Prices are estimates in USD based on training data. "
+                "Actual market prices may vary."
+            )
 
-    print(f"Predicted Price (Ensemble Model): ${ens_price:,.2f}")
-    print(f"Predicted Price (KNN Model): ${knn_price:,.2f}")
-
-    #return ens_price, knn_price
-
-# Example usage:
-#predict_price(Brand="Honda", Bike="CB500", Category="Sport", Power=50, Displacement=471, Torque=43, Mileage=20000, Age=5)
-if __name__ == "__main__":
-    script_dir = os.path.dirname(os.path.abspath(__file__)) 
-    filepath = os.path.join(script_dir, "Files/")
-    print("🚀 Welcome to the Bike Price Predictor!")
-    defaults = get_default_values()
-    user_inputs = get_user_input(defaults)
-    predict_price(*user_inputs)
+        except Exception as e:
+            st.error(f"Something went wrong: {e}")
+            st.info("Make sure the model files are present in `Project/Files/`.")
