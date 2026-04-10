@@ -7,16 +7,24 @@ import gzip
 import warnings
 import os
 
-# ── sklearn compatibility shim ────────────────────────────────────────────────
-# Models were saved with sklearn 1.4 which used _RemainderColsList internally.
-# Newer sklearn versions renamed/removed it — we restore it before unpickling.
+# ── sklearn compatibility shims ───────────────────────────────────────────────
+# Patch 1: _RemainderColsList removed in sklearn 1.5+
 import sklearn.compose._column_transformer as _ct
 if not hasattr(_ct, "_RemainderColsList"):
     class _RemainderColsList(list):
-        """Compatibility stub for models pickled with sklearn 1.4."""
         def __reduce__(self):
             return (self.__class__, (list(self),))
     _ct._RemainderColsList = _RemainderColsList
+
+# Patch 2: SimpleImputer._fill_dtype added in sklearn 1.5 — old pickles lack it.
+from sklearn.impute import SimpleImputer as _SI
+import numpy as _np
+_si_orig_transform = _SI.transform
+def _si_transform_safe(self, X):
+    if not hasattr(self, "_fill_dtype"):
+        self._fill_dtype = _np.float64
+    return _si_orig_transform(self, X)
+_SI.transform = _si_transform_safe
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
