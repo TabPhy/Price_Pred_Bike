@@ -22,22 +22,20 @@ FILES_DIR = os.path.join(BASE_DIR, "Project", "Files")
 @st.cache_resource(show_spinner="Loading models…")
 def load_models():
     ensemble = joblib.load(gzip.open(os.path.join(FILES_DIR, "tuned_ensemble_model.pkl.gz"), "rb"))
-    knn      = joblib.load(open(os.path.join(FILES_DIR, "knn_model.pkl"), "rb"))
+    knn      = joblib.load(gzip.open(os.path.join(FILES_DIR, "knn_model.pkl.gz"), "rb"))
     return ensemble, knn
 
-@st.cache_data(show_spinner=False)
-def load_defaults():
-    df = pd.read_pickle(os.path.join(FILES_DIR, "df_all_brands.pkl"))
-    return {
-        "Brand":         df["Brand"].mode()[0],
-        "Bike":          df["Bike"].mode()[0],
-        "Category":      df["Category"].mode()[0],
-        "Power [hp]":    round(df["Power (hp)"].mean(), 1),
-        "Displacement":  round(df["Displacement (ccm)"].mean(), 1),
-        "Torque [Nm]":   round(df["Torque (Nm)"].mean(), 1),
-        "Mileage [km]":  round(df["mileage"].mean(), 0),
-        "Age [a]":       round(df["Age"].mean(), 0),
-    }
+# Defaults computed from all_bikez_curated.csv — avoids loading the LFS-tracked df_all_brands.pkl
+DEFAULTS = {
+    "Brand":        "bmw",
+    "Bike":         "r 1200 gs",
+    "Category":     "Sport",
+    "Power [hp]":   50.8,
+    "Displacement": 552.5,
+    "Torque [Nm]":  64.5,
+    "Mileage [km]": 15000.0,
+    "Age [a]":      5,
+}
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 KNOWN_BRANDS = ["BMW", "Ducati", "KTM", "Royal Enfield", "Suzuki", "Yamaha"]
@@ -56,8 +54,6 @@ st.markdown(
 )
 st.divider()
 
-defaults = load_defaults()
-
 col1, col2 = st.columns(2)
 
 with col1:
@@ -65,19 +61,19 @@ with col1:
     category = st.selectbox("Category", options=CATEGORIES,
                             index=CATEGORIES.index("Sport") if "Sport" in CATEGORIES else 0)
     power = st.number_input("Power (hp)", min_value=1.0, max_value=500.0,
-                            value=defaults["Power [hp]"], step=1.0)
+                            value=DEFAULTS["Power [hp]"], step=1.0)
     displacement = st.number_input("Displacement (ccm)", min_value=50.0, max_value=3000.0,
-                                   value=defaults["Displacement"], step=10.0)
+                                   value=DEFAULTS["Displacement"], step=10.0)
 
 with col2:
-    bike_model = st.text_input("Model name", value=defaults["Bike"],
+    bike_model = st.text_input("Model name", value=DEFAULTS["Bike"],
                                help="e.g. R1200GS, MT-07, 1290 Super Duke")
     torque = st.number_input("Torque (Nm)", min_value=1.0, max_value=500.0,
-                             value=defaults["Torque [Nm]"], step=1.0)
+                             value=DEFAULTS["Torque [Nm]"], step=1.0)
     mileage = st.number_input("Mileage (km)", min_value=0.0, max_value=500_000.0,
-                              value=defaults["Mileage [km]"], step=500.0)
+                              value=DEFAULTS["Mileage [km]"], step=500.0)
     age = st.number_input("Age (years)", min_value=0, max_value=60,
-                          value=int(defaults["Age [a]"]), step=1)
+                          value=int(DEFAULTS["Age [a]"]), step=1)
 
 st.divider()
 
