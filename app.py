@@ -120,6 +120,11 @@ if st.button("💰 Predict Price", use_container_width=True, type="primary"):
             }
 
             X = pd.DataFrame([input_data])
+            # pandas 3.0 defaults strings to StringDtype instead of object.
+            # The fitted ColumnTransformer expects object dtype — cast explicitly.
+            for col in ["Brand", "Bike", "Category"]:
+                X[col] = X[col].astype(object)
+            X["Condition"] = X["Condition"].astype(bool)
 
             transformer = FunctionTransformer(np.log1p, inverse_func=np.expm1, validate=True)
 
