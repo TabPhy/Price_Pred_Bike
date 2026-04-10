@@ -7,6 +7,17 @@ import gzip
 import warnings
 import os
 
+# ── sklearn compatibility shim ────────────────────────────────────────────────
+# Models were saved with sklearn 1.4 which used _RemainderColsList internally.
+# Newer sklearn versions renamed/removed it — we restore it before unpickling.
+import sklearn.compose._column_transformer as _ct
+if not hasattr(_ct, "_RemainderColsList"):
+    class _RemainderColsList(list):
+        """Compatibility stub for models pickled with sklearn 1.4."""
+        def __reduce__(self):
+            return (self.__class__, (list(self),))
+    _ct._RemainderColsList = _RemainderColsList
+
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="🏍️ Bike Price Predictor",
