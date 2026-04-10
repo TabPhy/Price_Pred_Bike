@@ -90,7 +90,9 @@ with col1:
                                    value=DEFAULTS["Displacement"], step=10.0)
 
 with col2:
-
+    bike_model = st.text_input("Model name", value="",
+                               placeholder="e.g. r1250gs, mt-07, 1290 super duke",
+                               help="Optional — leave blank to use training data average")
     torque = st.number_input("Torque (Nm)", min_value=1.0, max_value=500.0,
                              value=DEFAULTS["Torque [Nm]"], step=1.0)
     mileage = st.number_input("Mileage (km)", min_value=0.0, max_value=500_000.0,
